@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/react-list-products-useEffect/static/css/main.02e0d8e4.css",
+    "main.js": "/react-list-products-useEffect/static/js/main.19f619fe.js",
+    "index.html": "/react-list-products-useEffect/index.html",
+    "main.02e0d8e4.css.map": "/react-list-products-useEffect/static/css/main.02e0d8e4.css.map",
+    "main.19f619fe.js.map": "/react-list-products-useEffect/static/js/main.19f619fe.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.02e0d8e4.css",
+    "static/js/main.19f619fe.js"
+  ]
+}
