@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { getProducts } from "./API/getProducts";
 import { getCategory } from "./API/getCategory";
+import Pages from "./components/Pages";
+import getTotalProductsCount from "./API/getTotalProductsCount";
+import { getAllProducts } from "./API/getAllProducts";
 
 const App = () => {
   const [runFetch, setRunFetch] = useState(false);
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
-  const [select, setSelect] = useState(1);
+  const [select, setSelect] = useState('');
   const [addProduct, setAddProduct] = useState('');
   const [addPrice, setAddPrice] = useState('');
   const [indexFilterCategory, setIndexFilterCategory] = useState('all');
+
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCost, setTotalCost] = useState([]);
+
+  const quantityProductPerPage = 10;
 
   const isButtonDisabled = !addProduct || !addPrice;
 
@@ -22,22 +31,42 @@ const App = () => {
         const newCategory = await getCategory();
         setCategory(newCategory);
 
-        console.log(newProducts);
-        console.log(newCategory);
+        const totalProductsCount = await getTotalProductsCount();
+        setTotalPages(Math.ceil(totalProductsCount / quantityProductPerPage));
+
+        const totalCostProducts = await getAllProducts();
+        setTotalCost(totalCostProducts);
       } catch(error) {
         console.log('Fetch error!!!');
       }
-    })()    // анонімна функція, яка сама викликається
+    })()
+  }, [runFetch]); 
 
-    console.log('out of async func');
-  }, [runFetch]);  
+  const onPageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  // const handleCategoryChange = (categoryId) => {
+  //   setIndexFilterCategory(categoryId);
+  //   setCurrentPage(0);
+  //   setShowPagination(categoryId === 'all');
+  // };
+
+  // const filteredProducts = indexFilterCategory === 'all' ? products : products.filter(product => product.category === indexFilterCategory);
+  // const paginatedProducts = filteredProducts.slice((currentPage - 1) * quantityProductPerPage, currentPage * quantityProductPerPage);
 
   // ADD ====================================================
 
   const addNewProduct = async () => {
     try {
-      if (!category) {
-        console.error('Category is undefined');
+      if (!category || category.length === 0) {
+        console.error('Category is undefined or empty');
+        return;
+      }
+
+      const selectedCategory = category.find(item => item.id.toString() === select);
+      if (!selectedCategory) {
+        console.error('Selected category is not found');
         return;
       }
 
@@ -49,7 +78,7 @@ const App = () => {
         body: JSON.stringify({
           title: addProduct,
           price: +addPrice,
-          category: category.find(item => item.id === select).id
+          category: selectedCategory.id
         }),
       });
 
@@ -58,7 +87,8 @@ const App = () => {
         setProducts([...products, newProduct]);
         setAddProduct("");
         setAddPrice("");
-        setSelect(1);
+        setSelect("");
+        setRunFetch(prev => !prev);
         console.log("New product added:", newProduct);
         console.log(products);
       } else {
@@ -76,17 +106,24 @@ const App = () => {
       try {
         const filteredProducts = await filterProductsCategory();
         setProducts(filteredProducts);
+
+        if (indexFilterCategory === 'all') {
+          const totalProductsCount = await getTotalProductsCount();
+          setTotalPages(Math.ceil(totalProductsCount / quantityProductPerPage));
+        } else {
+          setTotalPages(1); // Приховуємо пагінацію, якщо обрано конкретну категорію
+        }
       } catch (error) {
         console.error('Error filtering products by category:', error);
       }
     })();
   }, [indexFilterCategory]);
 
-  const filterProductsCategory = async () => {
+  const filterProductsCategory = async (page = 0, limit = 10) => {
     try {
       let filteredProducts;
-      if (indexFilterCategory === 'all') { // Перевірка чи обрано всі категорії
-        filteredProducts = await getProducts(); // Отримання всіх продуктів
+      if (indexFilterCategory === 'all') {
+        filteredProducts = await getProducts(page, limit);
       } else {
         const response = await fetch(`http://localhost:3000/product?category=${indexFilterCategory}`);
         filteredProducts = await response.json();
@@ -102,6 +139,18 @@ const App = () => {
 
   return (
     <div className="container">
+      <div className="navigation">
+        <div className="navigation__title-box">
+          <h1>
+            СПИСОК ПРОДУКТІВ
+          </h1>
+        </div>
+
+        <div className="navigation__btn-box">
+          <Pages currentPage={currentPage} totalPages={totalPages} onPageChange={onPageChange} setProducts={setProducts} />
+        </div>
+      </div>
+      
       <input 
         onChange={ e => setAddProduct(e.target.value) }
         type="text" 
@@ -118,7 +167,8 @@ const App = () => {
         placeholder="Ціна товару"
       />
 
-      <select onChange={ e => setSelect(+e.target.value) } name="productCategory" className="productCategory" value={ select }>
+      <select onChange={ e => setSelect(e.target.value) } name="productCategory" className="productCategory" value={ select }>
+      <option value=""></option>  
         {
           category.map(item => <option value={ item.id } key={ item.id }> { item.title } </option>)
         }
@@ -127,27 +177,41 @@ const App = () => {
       <button onClick={ addNewProduct } className="addProduct" disabled={ isButtonDisabled }>Додати</button>
 
       <div className="filter-wrapper">
-        <div className="filter-text-box">
-          <p className="filter-text">
-            Фільтрувати по категорії:&nbsp;
-          </p>
+        <div className="filter-block">
+          <div className="filter-text-box">
+            <p className="filter-text">
+              Фільтрувати по категорії:&nbsp;
+            </p>
+          </div>
+          
+          <div className="filter">
+            <select onChange={ e => setIndexFilterCategory(e.target.value) } name="productCategorySelect" className="productCategorySelect" value={ indexFilterCategory }>
+              <option value="all"></option>
+              <option value="all">Усі категорії</option>            
+              {
+                category.map(item => <option value={ item.id } key={ item.id }> { item.title } </option>)
+              }
+            </select>
+          </div>
         </div>
-        
-        <div className="filter">
-          <select onChange={ e => setIndexFilterCategory(e.target.value) } name="productCategorySelect" className="productCategorySelect" value={ indexFilterCategory }>
-            <option value="all">Всі категорії</option>            
+
+        <div className="total-prod">
+          <p className="total-prod-item">
+            Всього:&nbsp;
             {
-              category.map(item => <option value={ item.id } key={ item.id }> { item.title } </option>)
+              totalCost.reduce((acc, item) => acc + item.price, 0)
             }
-          </select>
+
+        &nbsp;грн.
+        </p>
         </div>
       </div>
 
       {
-        products.map(product => <p key={ product.id }>{ product.title }: { product.price } грн. (категорія { product.category }) </p>)
+        products.map(product => <p key={ product.id } className="product"><b>{ product.title }:</b>&nbsp;&nbsp;&nbsp;{ product.price } грн.&nbsp;&nbsp;&nbsp;<i>(категорія { product.category }</i>) </p>)
       }
-      <p>
-        Всього:&nbsp;
+      <p className="total">
+        Всього на сторінці:&nbsp;
         {
           products.reduce((acc, item) => acc + item.price, 0)
         }
@@ -159,6 +223,9 @@ const App = () => {
 }
 
 export default App;
+
+
+
 
 
 
